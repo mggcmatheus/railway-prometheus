@@ -1,0 +1,61 @@
+groups:
+  - name: billings-ease-backend-alerts
+    rules:
+      - alert: BillingsBackendDown
+        expr: up{job="billings-ease-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: billings-ease-backend
+        annotations:
+          summary: "Backend fora do ar"
+          description: "O target billings-ease-backend está DOWN há mais de 2 minutos."
+
+      - alert: BillingsBackendHigh5xxRate
+        expr: |
+          (
+            sum(rate(billings_http_requests_total{job="billings-ease-backend",status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(billings_http_requests_total{job="billings-ease-backend"}[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: billings-ease-backend
+        annotations:
+          summary: "Taxa alta de erro 5xx"
+          description: "A taxa de 5xx está acima de 5% por 10 minutos."
+
+      - alert: BillingsBackendHighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(billings_http_request_duration_seconds_bucket{job="billings-ease-backend"}[5m])) by (le)
+          ) > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          service: billings-ease-backend
+        annotations:
+          summary: "Latência p95 alta"
+          description: "Latência p95 acima de 1.5s por 10 minutos."
+
+      - alert: BillingsBackendNoTraffic
+        expr: sum(rate(billings_http_requests_total{job="billings-ease-backend"}[15m])) == 0
+        for: 30m
+        labels:
+          severity: info
+          service: billings-ease-backend
+        annotations:
+          summary: "Sem tráfego na API"
+          description: "Nenhuma requisição registrada na API nos últimos 30 minutos."
+
+      - alert: BillingsPrometheusTargetMissing
+        expr: absent(up{job="billings-ease-backend"})
+        for: 5m
+        labels:
+          severity: critical
+          service: billings-ease-backend
+        annotations:
+          summary: "Target não encontrado"
+          description: "Prometheus não está encontrando o target billings-ease-backend."
